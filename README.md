@@ -1,5 +1,9 @@
 # Multi-tenancy using schemas with Entity Framework and PostgreSQL
 
+* dotnet    `7.0.111`
+* dotnet-ef     `7.0.111`
+* PostgreSQL    `15.2`
+
 | Approach| Column for Tenant?|Schema per Tenant?|Multiple Databases?|EF Core Support|
 |---|---|---|---|---|
 |Discriminator (column)|Yes|No|No|Global query filter|
@@ -72,3 +76,179 @@ public class StoresController : ControllerBase
 Now we are ready to run the project for the first time with `dotnet run`.
 
 > You should be able to access Swagger on `http://localhost:5000/swagger`.
+
+### HQ Models and Context
+
+Before anything, we will need to install the Entity Framework tool/package and the PostgreSQL driver.
+
+```bash
+# If you don't have the tool already installed
+dotnet tool install --global dotnet-ef
+
+dotnet add package Microsoft.EntityFrameworkCore.Design
+dotnet add package Npgsql.EntityFrameworkCore.PostgreSQL
+```
+
+For the global entities, let's go ahead and create two simple ones: `Store` and `Product`. Because we are the product makers we can control the product catalogue and details from our head quarters, each store will be able to access that.
+
+```bash
+mkdir Models
+touch Models/Store.cs
+touch Models/Product.cs
+```
+
+```cs
+using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace ChocolateStores.Models;
+
+[Table("stores")]
+public class Store
+{
+    [Column("code")]
+    public string Code { get; set; } = string.Empty;
+
+    [Column("name")]
+    public string Name { get; set; } = string.Empty;
+
+    [Column("city")]
+    public string City { get; set; } = string.Empty;
+
+    [Column("schema")]
+    public string Schema { get; set; } = string.Empty;
+}
+
+public class StoreConfiguration : IEntityTypeConfiguration<Store>
+{
+    public void Configure(EntityTypeBuilder<Store> builder)
+    {
+        builder.HasKey(x => x.Code);
+
+        builder.HasIndex(x => x.Schema).IsUnique();
+    }
+}
+```
+
+```cs
+using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace ChocolateStores.Models;
+
+[Table("products")]
+public class Product
+{
+    [Column("code")]
+    public string Code { get; set; } = string.Empty;
+
+    [Column("name")]
+    public string Name { get; set; } = string.Empty;
+
+    [Column("type")]
+    public string Type { get; set; } = string.Empty;
+
+    [Column("discontinued")]
+    public bool IsDiscontinued { get; set; }
+}
+
+public class ProductConfiguration : IEntityTypeConfiguration<Product>
+{
+    public void Configure(EntityTypeBuilder<Product> builder)
+    {
+        builder.HasKey(x => x.Code);
+    }
+}
+```
+We can create now the `HQContext` that will handle requests to the global schema. It is important to keep this context in its own schema with its own migrations history table. To do that we will override the `OnConfiguring` method to add any configuration we may need (like the connection string).
+
+```bash
+mkdir Contexts
+touch Contexts/HQContext.cs
+```
+
+```cs
+using ChocolateStores.Models;
+using Microsoft.EntityFrameworkCore;
+
+namespace ChocolateStores.Context;
+
+public class AppDataContext : DbContext
+{
+    public static readonly string Schema = "hq";
+    public static readonly string Migrations = "_migrations";
+    protected readonly string _connection;
+
+    public AppDataContext(IConfiguration configuration, DbContextOptions<AppDataContext> options)
+        : base(options)
+    {
+        _connection = GetConnection(configuration);
+    }
+
+    public DbSet<Store> Stores { get; set; }
+    public DbSet<Product> Products { get; set; }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.HasDefaultSchema(Schema);
+
+        modelBuilder.ApplyConfigurationsFromAssembly(
+            typeof(AppDataContext).Assembly,
+            t => t.Namespace == typeof(Store).Namespace
+        );
+    }
+
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        optionsBuilder.UseNpgsql(_connection, x => x.MigrationsHistoryTable(Migrations, Schema));
+    }
+
+    public static string GetConnection(IConfiguration configuration)
+    {
+        return configuration.GetConnectionString("DefaultConnection")
+            ?? throw new Exception("Connection string not found");
+    }
+}
+```
+
+We need to update the `appsettings.json` to include our connection to the database (local or remote).
+
+```json
+"ConnectionStrings": {
+    "DefaultConnection": "Host=;Database=chocolate_stores;Username=;Password="
+}
+```
+
+And also need to add the `HQContext` to the `Program.cs`.
+
+```cs
+using ChocolateStores.Context;
+...
+builder.Services.AddDbContext<HQContext>();
+...
+```
+
+And voilà, we are set to perform our first migration. Because we will have multiple contexts we need to specify them in the command, also we will separate them in two directories to keep things organized.
+
+```bash
+dotnet ef migrations add InitialHQ_StoresProducts --context HQContext --output-dir Migrations/HQ
+```
+
+To perform those migrations on every startup, we can extend the `Program.cs` to include those operations right after we build the `WebApplication app`:
+
+```cs
+...
+using Microsoft.EntityFrameworkCore;
+...
+WebApplication app = builder.Build();
+
+using (IServiceScope scope = app.Services.CreateScope())
+{
+    HQContext hqContext = scope.ServiceProvider.GetRequiredService<HQContext>();
+
+    hqContext.Database.Migrate();
+}
+...
+```
