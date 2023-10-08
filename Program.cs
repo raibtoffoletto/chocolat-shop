@@ -6,6 +6,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddDbContext<HQContext>();
+builder.Services.AddDbContext<InStoreContext>();
 
 WebApplication app = builder.Build();
 

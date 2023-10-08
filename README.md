@@ -365,3 +365,151 @@ We can now add some data via swagger. So let's populate our table with these rec
 
 🎉 We are all set for the HQ tables and data. Let's move on to the store per store api.
 
+## In Store API
+
+### Creating Migrations
+
+For this part let's create a simple entity/table just with the store's catalogue: the products it sells and the current stock. And to keep it organised, it will be in a different directory and namespace: `Models/InStore/Catalogue.cs`.
+
+```cs
+using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace ChocolateStores.Models.InStore;
+
+[Table("catalogue")]
+public class Catalogue
+{
+    [Column("code")]
+    public string Code { get; set; } = string.Empty;
+
+    [Column("stock")]
+    public int Stock { get; set; }
+
+    [Column("last_order")]
+    public DateTime LastOrder { get; set; } = DateTime.Now;
+}
+
+public class CatalogueConfiguration : IEntityTypeConfiguration<Catalogue>
+{
+    public void Configure(EntityTypeBuilder<Catalogue> builder)
+    {
+        builder.HasKey(x => x.Code);
+    }
+}
+```
+
+Before creating the in store context, we will need a way to detect it later on, so we will create the interface `Contexts/IInStoreContext.cs`:
+
+```cs
+namespace ChocolateStores.Context;
+
+public interface IInStoreContext
+{
+    public string Schema { get; }
+}
+```
+
+Now we can create our `InStoreContext.cs` based on our HQ one, but with a few modifications. We will set the default schema name with the PostgreSQL's `public`, however we are not going to perform migrations on it. We will also need an extra constructor that can accept the schema name.
+
+```cs
+using ChocolateStores.Models.InStore;
+using Microsoft.EntityFrameworkCore;
+
+namespace ChocolateStores.Context;
+
+public class InStoreContext : DbContext, IInStoreContext
+{
+    public static readonly string DefaultSchema = "public";
+    protected readonly string _connection;
+    public string Schema { get; }
+
+    public InStoreContext(IConfiguration configuration, DbContextOptions<InStoreContext> options)
+        : base(options)
+    {
+        Schema = DefaultSchema;
+
+        _connection = HQContext.GetConnection(configuration);
+    }
+
+    public InStoreContext(IConfiguration configuration, string schema)
+    {
+        Schema = schema;
+
+        _connection = HQContext.GetConnection(configuration);
+    }
+
+    public DbSet<Catalogue> Catalogue { get; set; }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.HasDefaultSchema(Schema);
+
+        modelBuilder.ApplyConfigurationsFromAssembly(
+            typeof(InStoreContext).Assembly,
+            t => t.Namespace == typeof(Catalogue).Namespace
+        );
+    }
+
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        optionsBuilder.UseNpgsql(
+            _connection,
+            x => x.MigrationsHistoryTable(HQContext.Migrations, Schema)
+        );
+    }
+}
+```
+
+We can now register this context in the `Program.cs` by adding `builder.Services.AddDbContext<InStoreContext>();` and create our fist migration:
+
+```bash
+dotnet ef migrations add InitialInStore_Catalogue --context InStoreContext --output-dir Migrations/InStore
+```
+
+If we have a look at the Migrations directory we will see that we have created it succefully. Easy, right? So we can go ahead and apply those migrations? Not quite... now it is when the real trickery starts. We will create a constructor that accepts the `DbContext` being used for performing the migration and store it in a private property. After that, we can remove all mentions to the `public` schema and replace it with `_context.Schema`, thus turning this migration class dynamic. It should look something like this:
+
+```cs
+using ChocolateStores.Context;
+using Microsoft.EntityFrameworkCore.Migrations;
+
+namespace ChocolateStores.Migrations.InStore
+{
+    public partial class InitialInStore_Catalogue : Migration
+    {
+        private readonly IInStoreContext _context;
+
+        public InitialInStore_Catalogue(IInStoreContext context)
+        {
+            _context = context;
+        }
+
+        protected override void Up(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.EnsureSchema(name: _context.Schema);
+
+            migrationBuilder.CreateTable(
+                name: "catalogue",
+                schema: _context.Schema,
+                columns: table =>
+                    new
+                    {
+                        code = table.Column<string>(type: "text", nullable: false),
+                        stock = table.Column<int>(type: "integer", nullable: false),
+                        last_order = table.Column<DateTime>(
+                            type: "timestamp with time zone",
+                            nullable: false
+                        )
+                    },
+                constraints: table => table.PrimaryKey("PK_catalogue", x => x.code)
+            );
+        }
+
+        protected override void Down(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.DropTable(name: "catalogue", schema: _context.Schema);
+        }
+    }
+}
+```
