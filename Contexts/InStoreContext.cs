@@ -1,3 +1,4 @@
+using ChocolateStores.Models;
 using ChocolateStores.Models.InStore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -32,6 +33,7 @@ public class InStoreContext : DbContext, IInStoreContext
     }
 
     public DbSet<Catalogue> Catalogue { get; set; }
+    public DbSet<Product> Products { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -41,6 +43,13 @@ public class InStoreContext : DbContext, IInStoreContext
             typeof(InStoreContext).Assembly,
             t => t.Namespace == typeof(Catalogue).Namespace
         );
+
+        modelBuilder.Entity<Product>(x =>
+        {
+            x.HasKey(x => x.Code);
+            x.Metadata.SetSchema(HQContext.Schema);
+            x.Metadata.SetIsTableExcludedFromMigrations(true);
+        });
     }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)

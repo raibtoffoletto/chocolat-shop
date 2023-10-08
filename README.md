@@ -14,7 +14,7 @@
 
 ### Scaffolding the base project
 
-Let's create the base project from the `webapi` template:
+We start by creating the base project from the `webapi` template:
 
 ```bash
 dotnet new webapi -o ChocolateStores
@@ -24,10 +24,10 @@ dotnet new editorconfig
 git init -b main
 ```
 
-And install the basic packages needed for this project: Entity Framework and the PostgreSQL driver.
+And by installing the extra packages needed: Entity Framework and the PostgreSQL driver.
 
 ```bash
-# If you don't have the tool already installed
+# If you do not have the tool already installed
 dotnet tool install --global dotnet-ef
 
 dotnet add package Microsoft.EntityFrameworkCore.Design
@@ -41,7 +41,7 @@ rm -R Properties
 rm WeatherForecast.cs Controllers/WeatherForecastController.cs
 ```
 
-And this is will be our minimal `Program.cs`:
+And replace the `Program.cs` with this minimal set up:
 
 ```cs
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
@@ -57,7 +57,8 @@ app.MapControllers();
 app.Run();
 ```
 
-And let's create the stores controller `Controllers/StoresController.cs`:
+However, we need at least one controller for the project to run.
+So we can create the stores controller `Controllers/StoresController.cs` with a placeholder method for the moment:
 
 ```cs
 using Microsoft.AspNetCore.Mvc;
@@ -87,11 +88,11 @@ public class StoresController : ControllerBase
 
 Now we are ready to run the project for the first time with `dotnet run`.
 
-> You should be able to access Swagger on `http://localhost:5000/swagger`.
+> You should be able to access Swagger at this address: [http://localhost:5000/swagger](http://localhost:5000/swagger).
 
 ### HQ Models and Context
 
-For the global entities, we will go ahead and create two simple ones: `Models/Store.cs` and `Models/Product.cs`. Because we are the product's makers, we can control the product catalogue and details from our head quarters, each store should be able to access that.
+For the global entities, we will go ahead and create two simple ones: `Models/Store.cs` and `Models/Product.cs`. Because we are the product's makers, we can control the product catalogue and details from our head quarters, which each store will be able to access later on.
 
 ```cs
 using System.ComponentModel.DataAnnotations.Schema;
@@ -158,7 +159,10 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
     }
 }
 ```
-We can create now the `Contexts/HQContext.cs` that will handle requests to the global schema. It is important to keep this context in its own schema with its own migrations history table. To do that we will override the `OnConfiguring` method to add any configuration we may need (like the connection string).
+
+We can create now the `Contexts/HQContext.cs`, it will handle the requests to the global schema.
+
+It is important to keep this context in its own schema with its own migrations history table. In order to do that, we will override the `OnConfiguring` method and add any configuration we may need inside it.
 
 
 ```cs
@@ -205,7 +209,7 @@ public class AppDataContext : DbContext
 }
 ```
 
-Now we need to update the `appsettings.json` to include our connection to the database (local or remote).
+Now we need to update the `appsettings.json` to include our connection to the database (local or remote):
 
 ```json
 "ConnectionStrings": {
@@ -213,7 +217,7 @@ Now we need to update the `appsettings.json` to include our connection to the da
 }
 ```
 
-And also need to add the `HQContext` to the `Program.cs`.
+And we also need to add the `HQContext` to the `Program.cs`.
 
 ```cs
 using ChocolateStores.Context;
@@ -222,7 +226,9 @@ builder.Services.AddDbContext<HQContext>();
 ...
 ```
 
-And voilà, we are set to perform our first migration. Because we will have multiple contexts, we will need to specify each of them in the migration command, we will also separate them in two directories in order to keep things organized.
+Voilà, we are set to perform our first migration.
+
+Because we will have multiple contexts, we will need to specify each of them in the migration command. We will also separate them in two directories in order to keep things organized.
 
 ```bash
 dotnet ef migrations add InitialHQ_StoresProducts --context HQContext --output-dir Migrations/HQ
@@ -247,7 +253,7 @@ using (IServiceScope scope = app.Services.CreateScope())
 
 ### HQ Controllers and sample data
 
-For the HQ's controllers let's keep it simple, just a `GET` and a `POST` for this moment. There's no need for a full CRUD api in this proof of concept. We are also not going to implement any services/repositories for the sake of brevity, therefore we are going to inject the `HQContext` directly in the `StoresController`
+For the HQ's controllers let us keep it simple, just a `GET` and a `POST` for this moment. There's no need for a full CRUD api in this proof of concept. We are also not going to implement any services/repositories for the sake of brevity, therefore we are going to inject the `HQContext` directly in the `StoresController`
 
 ```cs
 using ChocolateStores.Context;
@@ -292,7 +298,7 @@ public class StoresController : ControllerBase
 }
 ```
 
-And let's create a `Controllers/ProductsController.cs` in the same fashion:
+And we will create a `Controllers/ProductsController.cs` in the same fashion:
 
 ```cs
 using ChocolateStores.Context;
@@ -337,12 +343,16 @@ public class ProductsController : ControllerBase
 }
 ```
 
-We can now add some data via swagger. So let's populate our table with these records:
+We can now add some data via swagger. So let us populate our table with these records:
+
+#### Stores
 
 | code | name              | city      | schema |
 | ---- | ----------------- | --------  | ------ |
 | ST01 | Chocolate Store   | Brugge    | st01   |
 | ST02 | Chocolate Express | Bruxelles | st02   |
+
+#### Products
 
 | code | name               | type     |
 | ---- | ------------------ | -------- |
@@ -351,15 +361,15 @@ We can now add some data via swagger. So let's populate our table with these rec
 | PR01 | Manon Noir         | Pralines |
 | PR02 | Manon au Lait      | Pralines |
 
-> \* The `isDiscontinued` prop can be omitted. It will default to `false`.
+> \* The `isDiscontinued` property can be omitted from the json. It will default to `false`.
 
-🎉 We are all set for the HQ tables and data. Let's move on to the store per store api.
+🎉 We are all set with the HQ tables and data. Let us move on to the in store api.
 
 ## In Store API
 
 ### Creating Migrations
 
-For this part let's create a simple entity/table just with the store's catalogue: the products it sells and the current stock. And to keep it organised, it will be in a different directory/namespace: `Models/InStore/Catalogue.cs`.
+For this part let us create a simple entity/table just with the store's catalogue: the products it sells and the current stock. And to keep it organised, it will be in a different directory/namespace: `Models/InStore/Catalogue.cs`.
 
 ```cs
 using System.ComponentModel.DataAnnotations.Schema;
@@ -390,7 +400,7 @@ public class CatalogueConfiguration : IEntityTypeConfiguration<Catalogue>
 }
 ```
 
-Before creating the in store context, we will need a way to detect which contexts use multiple schemas later on, for that we can create the interface `Contexts/IInStoreContext.cs`:
+Before creating the in store context, we will need later on a way to detect which contexts use dynamic schemas. So we will create the interface `Contexts/IInStoreContext.cs`:
 
 ```cs
 namespace ChocolateStores.Context;
@@ -401,7 +411,9 @@ public interface IInStoreContext
 }
 ```
 
-Now we go ahead and create our `Contexts/InStoreContext.cs` that implements the `IInStoreContext` interface. It is based on the HQ's one, but with a few modifications. We will set the default schema name with the PostgreSQL's `public`, however we are not going to perform any migrations on it. We will also need an extra constructor that can accept the schema name.
+Now we can go ahead and create our `Contexts/InStoreContext.cs` that implements the `IInStoreContext` interface.
+
+It is based on the HQ's one, but with a few modifications. We will set the default schema name with the PostgreSQL's `public`, however we are not going to perform any migrations on it. We will also need an extra constructor that can accept the schema name.
 
 ```cs
 using ChocolateStores.Models.InStore;
@@ -458,7 +470,7 @@ We can now register this context in the `Program.cs` by adding `builder.Services
 dotnet ef migrations add InitialInStore_Catalogue --context InStoreContext --output-dir Migrations/InStore
 ```
 
-If we have a look at the Migrations directory, we will see that we have successfully created it. Easy, right? *«So we can go ahead and apply those migrations?»* Not quite... now it is when the real trickery starts.
+If we have a look at the Migrations directory, we will see that we have successfully created the file. Easy, right? *«So we can go ahead and apply those migrations?»* Not quite... now it is when the real trickery starts.
 
 In the migration file, we will need a constructor that accepts the current `DbContext` being used to performing the migration and store it in a private field. After that, we can remove all mentions of the `public` schema and replace it with `_context.Schema`, thus turning this migration class a bit more dynamic. It should look something like this:
 
@@ -508,7 +520,7 @@ namespace ChocolateStores.Migrations.InStore
 
 ### Performing Migrations
 
-*So, now our migration class is dynamic, I can apply them, right?* Not really... there are some other things we need to take care before.EF expects migrations classes without constructors. So it will spit some errors if we try to apply the migrations with the `IInStoreContext` being expected during the class instantiation. The solution is pretty simple then... let's hack it!
+*«So, now our migration class is dynamic, I can apply them, right?»* Not really... there are some other things we need to take care before. EF expects migrations classes without constructors. So it will spit some errors if we try to apply the migrations with the `IInStoreContext` parameter being expected during the class instantiation. The solution is pretty simple then... we will hack it!
 
 The first step is to extend the `MigrationsAssembly` class, so go ahead and create the `Contexts/InStoreAssembly.cs` file.
 
@@ -518,7 +530,7 @@ The first step is to extend the `MigrationsAssembly` class, so go ahead and crea
 > 
 > Therefore, the solution presented here works fine for **this** exact EF's version, it may not work in the future.
 
-In the constructor we will pass all the params down to the base class, but store the current context in a private field. The secret sauce is done by overriding the `CreateMigration` method: First we check if we have a known `activeProvider` (i.e. a specific database flavour for EF to construct SQL statements), otherwise we throw an exception. Then let's check if the migration class contains a constructor with the `IInStoreContext` interface as argument. If it does, and our `_context` also implements the `IInStoreContext` interface, we go ahead and try to instantiate the `Migration` class with it, otherwise we fallback to the `base.CreateMigration` method.
+In its constructor we will pass all the params down to the base class, but store the current context in a private field. The secret sauce is done by overriding the `CreateMigration` method: First we check if we have a known `activeProvider` (i.e. a specific database flavour for EF to construct SQL statements), otherwise we throw an exception. Then let us check if the migration class contains a constructor with the `IInStoreContext` interface as argument. If it does, and our `_context` also implements the `IInStoreContext` interface, we go ahead and try to instantiate the `Migration` class with it, otherwise we fallback to the `base.CreateMigration` method.
 
 ```cs
 using Microsoft.EntityFrameworkCore;
@@ -617,7 +629,7 @@ internal class InStoreCacheKey
 }
 ```
 
-And now we create a factory (`Contexts/InStoreCacheKeyFactory.cs`) that implements our `InStoreCacheKey`:
+And then we create a factory (`Contexts/InStoreCacheKeyFactory.cs`) that implements it:
 
 ```cs
 using Microsoft.EntityFrameworkCore;
@@ -670,7 +682,7 @@ using (IServiceScope scope = app.Services.CreateScope())
 ...
 ```
 
-And let's go ahead and add an endpoint to the `StoresController.cs` to trigger those migrations, so we don't need to restart the app every time a store is created.
+And let us go ahead and add an endpoint to the `StoresController.cs` to trigger those migrations, so we do not need to restart the app every time a store is created.
 
 ```cs
 ...
@@ -704,13 +716,13 @@ And let's go ahead and add an endpoint to the `StoresController.cs` to trigger t
 ...
 ```
 
-> \* To avoid code duplication we could extract this logic to an extension.
+> \* To avoid code duplication you could extract this logic to an extension ;)
 
 ### Dynamically querying a store
 
 Now we have the database in place, it's time to set up a way to define what store is being querying at runtime and inject the `InStoreContext` accordingly. For that, we will be passing the `Store.Code` via the HTTP headers.
 
-To not pollute the `Program.cs`, and have better control of injection order, we are going to create an extension (`Infrastructure/StoreExtensions.cs`) to handle the registering of both database contexts. First, we will need to inject `IHttpContextAccessor`, so the `HttpContext` can be available to us. Then, we add the `HQContext` as before, and then we will add the `InStoreContext` as a scoped service. Inside the service registration, we check if the program is in designTime, if yes we return a default `InStoreContext`, so the schema does not impact the migrations. Otherwise, we access the HTTP request to get the store code and query the store schema from it, in case of not found we fallback to the default schema name.
+To not pollute the `Program.cs`, and have better control of injection order, we are going to create an extension (`Infrastructure/StoreExtensions.cs`) to handle the registering of both database contexts. First, we will need to inject `IHttpContextAccessor`, so the `HttpContext` can be available to us. Then, we add the `HQContext` as before, and only then we will add the `InStoreContext` as a scoped service. Inside the service registration, we check if the program is in designTime, if yes we return a default `InStoreContext`, so the schema does not impact the migrations. Otherwise, we access the HTTP request to get the store code and query the store schema from it, in case of not found we fallback to the default schema name.
 
 ```cs
 using ChocolateStores.Context;
@@ -884,9 +896,9 @@ public class InStoreController : ControllerBase
 }
 ```
 
-All set! Now we can pass the store id to those routes and operations will be restricted to the corresponding store. So let's add some data for the stores we had registered.
+All set! Now we can pass the store id to those routes and operations will be restricted to the corresponding store. So let us add some data for the stores we had registered using the `POST` method. Then when triggering the GET method, the correct list should be return.
 
-* **Store 01**
+#### **Store 01**
 
 | code | stock |
 | ---- | ----- |
@@ -895,9 +907,94 @@ All set! Now we can pass the store id to those routes and operations will be res
 | PR02 | 100   |
 | PR01 | 100   |
 
-* **Store 02**
+#### **Store 02**
 
 | code | stock |
 | ---- | ----- |
 | B02  | 100   |
 | PR02 | 100   |
+
+### Join query between schemas.
+
+One of the pitfalls of this architecture is that EF will not perform joining queries from sets that are not in the same context. For example, imagine that we want to return the catalogue list with the product's name and type and the in store current stock... one solution is to query the store products first, keep them in memory, then query the HQ's catalogue and join both lists using LINQ. This can be very slow (and memory consuming) depending on the size of the dataset in question. Other way would be to write manually a query and then cast its results to the corresponding DTO.
+
+However, there is also another solution: to add a `Products` set to the `InStoreContext`. To do that, the configuration is a bit different than the other entities. In the `OnModelCreating` method, we need to configure the `Product` entity as it is done in the `ProductConfiguration` class. We also need to set the correct schema to the entity's metadata, as well set it to be excluded from the migrations in that context.
+
+```cs
+using ChocolateStores.Models;
+...
+    public DbSet<Product> Products { get; set; }
+...
+        modelBuilder.Entity<Product>(x =>
+        {
+            x.HasKey(x => x.Code);
+            x.Metadata.SetSchema(HQContext.Schema);
+            x.Metadata.SetIsTableExcludedFromMigrations(true);
+        });
+```
+
+Now the `Products` table will accessible from the context, we will create a `Models/InStore/CatalogueDTO.cs` to join store and hq product's information:
+
+```cs
+namespace ChocolateStores.Models.InStore;
+
+public class CatalogueDTO
+{
+    public string Code { get; set; } = string.Empty;
+
+    public string Name { get; set; } = string.Empty;
+
+    public string Type { get; set; } = string.Empty;
+
+    public int Stock { get; set; }
+}
+```
+
+In the `InStoreController` we can extend the `POST` method to validate the product's code sent, and also create the `GET` method to return the `CatalogueDTO`:
+
+```cs
+...
+    public async Task<Catalogue> PostStock(Catalogue stock)
+    {
+        _logger.LogDebug("Updating stock for store: {store}", _storeContext.Schema);
+
+        Product product =
+            await _storeContext.Products.FirstOrDefaultAsync(
+                x => EF.Functions.ILike(x.Code, stock.Code)
+            ) ?? throw new Exception("Product code does not exist");
+
+        if (product.IsDiscontinued)
+        {
+            throw new Exception("Product is discontinued, cannot order any more");
+        }
+
+        Catalogue? catalogue = await _storeContext.Catalogue.FirstOrDefaultAsync(
+            x => x.Code == product.Code
+        );
+...
+    }
+
+    [HttpGet("Catalogue"), UseStoreHeader]
+    public async Task<IEnumerable<CatalogueDTO>> GetCatalogue()
+    {
+        _logger.LogDebug("Getting catalogue for store: {store}", _storeContext.Schema);
+
+        return await _storeContext.Catalogue
+            .Join(
+                _storeContext.Products,
+                c => c.Code,
+                p => p.Code,
+                (c, p) =>
+                    new CatalogueDTO
+                    {
+                        Code = c.Code,
+                        Name = p.Name,
+                        Type = p.Type,
+                        Stock = c.Stock
+                    }
+            )
+            .OrderBy(x => x.Name)
+            .ToListAsync();
+    }
+}
+```
