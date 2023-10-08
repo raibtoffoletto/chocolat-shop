@@ -21,7 +21,7 @@ public class ProductsController : ControllerBase
     [HttpGet]
     public async Task<IEnumerable<Product>> Get()
     {
-        _logger.LogDebug("Getting store list");
+        _logger.LogDebug("Getting product list");
 
         return await _hQContext.Products.OrderBy(x => x.Name).ToListAsync();
     }
@@ -29,9 +29,23 @@ public class ProductsController : ControllerBase
     [HttpPost]
     public async Task<Product> Post(Product product)
     {
-        _logger.LogDebug("Adding new store");
+        _logger.LogDebug("Adding new product {name}", product.Name);
 
-        _hQContext.Products.Add(product);
+        Product? _product = await _hQContext.Products.FirstOrDefaultAsync(
+            x => EF.Functions.ILike(x.Code, product.Code)
+        );
+
+        if (_product == null)
+        {
+            _hQContext.Products.Add(product);
+        }
+        else
+        {
+            _product.Name = product.Name;
+            _product.Type = product.Type;
+            _product.Price = product.Price;
+            _product.IsDiscontinued = product.IsDiscontinued;
+        }
 
         await _hQContext.SaveChangesAsync();
 

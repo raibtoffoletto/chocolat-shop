@@ -35,9 +35,22 @@ public class StoresController : ControllerBase
     [HttpPost]
     public async Task<Store> Post(Store store)
     {
-        _logger.LogDebug("Adding new store");
+        _logger.LogDebug("Adding new store {name}", store.Name);
 
-        _hQContext.Stores.Add(store);
+        Store? _store = await _hQContext.Stores.FirstOrDefaultAsync(
+            x => EF.Functions.ILike(x.Code, store.Code)
+        );
+
+        if (_store == null)
+        {
+            _hQContext.Stores.Add(store);
+        }
+        else
+        {
+            _store.Name = store.Name;
+            _store.City = store.City;
+            _store.Schema = store.Schema;
+        }
 
         await _hQContext.SaveChangesAsync();
 
@@ -51,6 +64,8 @@ public class StoresController : ControllerBase
 
         foreach (string schema in _hQContext.Stores.AsNoTracking().Select(x => x.Schema).ToList())
         {
+            _logger.LogDebug("Migrating schema {name}", schema);
+
             using InStoreContext worldContext = new(_configuration, schema);
 
             await worldContext.Database.MigrateAsync();
