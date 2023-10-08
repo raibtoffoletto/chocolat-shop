@@ -10,11 +10,17 @@ namespace ChocolateStores.Controllers;
 public class StoresController : ControllerBase
 {
     private readonly ILogger<StoresController> _logger;
+    private readonly IConfiguration _configuration;
     private readonly HQContext _hQContext;
 
-    public StoresController(ILogger<StoresController> logger, HQContext hQContext)
+    public StoresController(
+        ILogger<StoresController> logger,
+        IConfiguration configuration,
+        HQContext hQContext
+    )
     {
         _logger = logger;
+        _configuration = configuration;
         _hQContext = hQContext;
     }
 
@@ -36,5 +42,18 @@ public class StoresController : ControllerBase
         await _hQContext.SaveChangesAsync();
 
         return store;
+    }
+
+    [HttpGet("migrate")]
+    public async Task PostMigrate()
+    {
+        _logger.LogDebug("Performing migrations to all stores");
+
+        foreach (string schema in _hQContext.Stores.AsNoTracking().Select(x => x.Schema).ToList())
+        {
+            using InStoreContext worldContext = new(_configuration, schema);
+
+            await worldContext.Database.MigrateAsync();
+        }
     }
 }

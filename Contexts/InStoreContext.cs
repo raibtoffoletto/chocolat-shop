@@ -1,5 +1,7 @@
 using ChocolateStores.Models.InStore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace ChocolateStores.Context;
 
@@ -38,6 +40,10 @@ public class InStoreContext : DbContext, IInStoreContext
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
+        optionsBuilder
+            .ReplaceService<IMigrationsAssembly, InStoreAssembly>()
+            .ReplaceService<IModelCacheKeyFactory, InStoreCacheKeyFactory>();
+
         optionsBuilder.UseNpgsql(
             _connection,
             x => x.MigrationsHistoryTable(HQContext.Migrations, Schema)

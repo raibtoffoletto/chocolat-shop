@@ -12,7 +12,7 @@
 
 ## Head Quarter's API
 
-### Scafolding the base project
+### Scaffolding the base project
 
 Let's create the base project from the `webapi` template:
 
@@ -24,6 +24,16 @@ dotnet new editorconfig
 git init -b main
 ```
 
+And install the basic packages needed for this project: Entity Framework and the PostgreSQL driver.
+
+```bash
+# If you don't have the tool already installed
+dotnet tool install --global dotnet-ef
+
+dotnet add package Microsoft.EntityFrameworkCore.Design
+dotnet add package Npgsql.EntityFrameworkCore.PostgreSQL
+```
+
 We can already remove some unnecessary files:
 
 ```bash
@@ -31,7 +41,7 @@ rm -R Properties
 rm WeatherForecast.cs Controllers/WeatherForecastController.cs
 ```
 
-This is will be our minimal `Program.cs`:
+And this is will be our minimal `Program.cs`:
 
 ```cs
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
@@ -47,7 +57,7 @@ app.MapControllers();
 app.Run();
 ```
 
-And our first controller `Controllers/StoresController.cs`:
+And let's create the stores controller `Controllers/StoresController.cs`:
 
 ```cs
 using Microsoft.AspNetCore.Mvc;
@@ -81,23 +91,7 @@ Now we are ready to run the project for the first time with `dotnet run`.
 
 ### HQ Models and Context
 
-Before anything, we will need to install the Entity Framework tool/package and the PostgreSQL driver.
-
-```bash
-# If you don't have the tool already installed
-dotnet tool install --global dotnet-ef
-
-dotnet add package Microsoft.EntityFrameworkCore.Design
-dotnet add package Npgsql.EntityFrameworkCore.PostgreSQL
-```
-
-For the global entities, let's go ahead and create two simple ones: `Store` and `Product`. Because we are the product makers we can control the product catalogue and details from our head quarters, each store will be able to access that.
-
-```bash
-mkdir Models
-touch Models/Store.cs
-touch Models/Product.cs
-```
+For the global entities, we will go ahead and create two simple ones: `Models/Store.cs` and `Models/Product.cs`. Because we are the product's makers, we can control the product catalogue and details from our head quarters, each store should be able to access that.
 
 ```cs
 using System.ComponentModel.DataAnnotations.Schema;
@@ -164,12 +158,8 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
     }
 }
 ```
-We can create now the `HQContext` that will handle requests to the global schema. It is important to keep this context in its own schema with its own migrations history table. To do that we will override the `OnConfiguring` method to add any configuration we may need (like the connection string).
+We can create now the `Contexts/HQContext.cs` that will handle requests to the global schema. It is important to keep this context in its own schema with its own migrations history table. To do that we will override the `OnConfiguring` method to add any configuration we may need (like the connection string).
 
-```bash
-mkdir Contexts
-touch Contexts/HQContext.cs
-```
 
 ```cs
 using ChocolateStores.Models;
@@ -215,7 +205,7 @@ public class AppDataContext : DbContext
 }
 ```
 
-We need to update the `appsettings.json` to include our connection to the database (local or remote).
+Now we need to update the `appsettings.json` to include our connection to the database (local or remote).
 
 ```json
 "ConnectionStrings": {
@@ -232,13 +222,13 @@ builder.Services.AddDbContext<HQContext>();
 ...
 ```
 
-And voilà, we are set to perform our first migration. Because we will have multiple contexts we need to specify them in the command, also we will separate them in two directories to keep things organized.
+And voilà, we are set to perform our first migration. Because we will have multiple contexts, we will need to specify each of them in the migration command, we will also separate them in two directories in order to keep things organized.
 
 ```bash
 dotnet ef migrations add InitialHQ_StoresProducts --context HQContext --output-dir Migrations/HQ
 ```
 
-To perform those migrations on every startup, we can extend the `Program.cs` to include those operations right after we build the `WebApplication app`:
+To perform those migrations automatically on every startup, we can extend the `Program.cs` to include those operations right after we build the `WebApplication app`:
 
 ```cs
 ...
@@ -257,7 +247,7 @@ using (IServiceScope scope = app.Services.CreateScope())
 
 ### HQ Controllers and sample data
 
-For the controllers let's keep it simple, just a `GET` and a `POST`. There's no need for a full CRUD api in this proof of concept. We are also not going to implement any services/repositories for the sake of brevidity, therefore we are goint to inject the `HQContext` directly in the `StoresController`
+For the HQ's controllers let's keep it simple, just a `GET` and a `POST` for this moment. There's no need for a full CRUD api in this proof of concept. We are also not going to implement any services/repositories for the sake of brevity, therefore we are going to inject the `HQContext` directly in the `StoresController`
 
 ```cs
 using ChocolateStores.Context;
@@ -302,7 +292,7 @@ public class StoresController : ControllerBase
 }
 ```
 
-And let's create a `ProductsController` in the same fashion:
+And let's create a `Controllers/ProductsController.cs` in the same fashion:
 
 ```cs
 using ChocolateStores.Context;
@@ -361,7 +351,7 @@ We can now add some data via swagger. So let's populate our table with these rec
 | PR01 | Manon Noir         | Pralines |
 | PR02 | Manon au Lait      | Pralines |
 
-> \* The `isDiscontinued` prop can be ommited. It will default to `false`.
+> \* The `isDiscontinued` prop can be omitted. It will default to `false`.
 
 🎉 We are all set for the HQ tables and data. Let's move on to the store per store api.
 
@@ -369,7 +359,7 @@ We can now add some data via swagger. So let's populate our table with these rec
 
 ### Creating Migrations
 
-For this part let's create a simple entity/table just with the store's catalogue: the products it sells and the current stock. And to keep it organised, it will be in a different directory and namespace: `Models/InStore/Catalogue.cs`.
+For this part let's create a simple entity/table just with the store's catalogue: the products it sells and the current stock. And to keep it organised, it will be in a different directory/namespace: `Models/InStore/Catalogue.cs`.
 
 ```cs
 using System.ComponentModel.DataAnnotations.Schema;
@@ -400,7 +390,7 @@ public class CatalogueConfiguration : IEntityTypeConfiguration<Catalogue>
 }
 ```
 
-Before creating the in store context, we will need a way to detect it later on, so we will create the interface `Contexts/IInStoreContext.cs`:
+Before creating the in store context, we will need a way to detect which contexts use multiple schemas later on, for that we can create the interface `Contexts/IInStoreContext.cs`:
 
 ```cs
 namespace ChocolateStores.Context;
@@ -411,7 +401,7 @@ public interface IInStoreContext
 }
 ```
 
-Now we can create our `InStoreContext.cs` based on our HQ one, but with a few modifications. We will set the default schema name with the PostgreSQL's `public`, however we are not going to perform migrations on it. We will also need an extra constructor that can accept the schema name.
+Now we go ahead and create our `Contexts/InStoreContext.cs` that implements the `IInStoreContext` interface. It is based on the HQ's one, but with a few modifications. We will set the default schema name with the PostgreSQL's `public`, however we are not going to perform any migrations on it. We will also need an extra constructor that can accept the schema name.
 
 ```cs
 using ChocolateStores.Models.InStore;
@@ -462,13 +452,15 @@ public class InStoreContext : DbContext, IInStoreContext
 }
 ```
 
-We can now register this context in the `Program.cs` by adding `builder.Services.AddDbContext<InStoreContext>();` and create our fist migration:
+We can now register this context in the `Program.cs` by adding `builder.Services.AddDbContext<InStoreContext>();` (just below the `HQContext` line) and create our fist migration:
 
 ```bash
 dotnet ef migrations add InitialInStore_Catalogue --context InStoreContext --output-dir Migrations/InStore
 ```
 
-If we have a look at the Migrations directory we will see that we have created it succefully. Easy, right? So we can go ahead and apply those migrations? Not quite... now it is when the real trickery starts. We will create a constructor that accepts the `DbContext` being used for performing the migration and store it in a private property. After that, we can remove all mentions to the `public` schema and replace it with `_context.Schema`, thus turning this migration class dynamic. It should look something like this:
+If we have a look at the Migrations directory, we will see that we have successfully created it. Easy, right? *«So we can go ahead and apply those migrations?»* Not quite... now it is when the real trickery starts.
+
+In the migration file, we will need a constructor that accepts the current `DbContext` being used to performing the migration and store it in a private field. After that, we can remove all mentions of the `public` schema and replace it with `_context.Schema`, thus turning this migration class a bit more dynamic. It should look something like this:
 
 ```cs
 using ChocolateStores.Context;
@@ -513,3 +505,203 @@ namespace ChocolateStores.Migrations.InStore
     }
 }
 ```
+
+### Performing Migrations
+
+*So, now our migration class is dynamic, I can apply them, right?* Not really... there are some other things we need to take care before.EF expects migrations classes without constructors. So it will spit some errors if we try to apply the migrations with the `IInStoreContext` being expected during the class instantiation. The solution is pretty simple then... let's hack it!
+
+The first step is to extend the `MigrationsAssembly` class, so go ahead and create the `Contexts/InStoreAssembly.cs` file.
+
+> **<!> Warning**: This is not sanctioned by Microsoft, you will see the follow warning when trying to extend from that class:
+> 
+> *This is an internal API that supports the Entity Framework Core infrastructure and not subject to the same compatibility standards as public APIs. It may be changed or removed without notice in any release. You should only use it directly in your code with extreme caution and knowing that doing so can result in application failures when updating to a new Entity Framework Core release.*
+> 
+> Therefore, the solution presented here works fine for **this** exact EF's version, it may not work in the future.
+
+In the constructor we will pass all the params down to the base class, but store the current context in a private field. The secret sauce is done by overriding the `CreateMigration` method: First we check if we have a known `activeProvider` (i.e. a specific database flavour for EF to construct SQL statements), otherwise we throw an exception. Then let's check if the migration class contains a constructor with the `IInStoreContext` interface as argument. If it does, and our `_context` also implements the `IInStoreContext` interface, we go ahead and try to instantiate the `Migration` class with it, otherwise we fallback to the `base.CreateMigration` method.
+
+```cs
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations.Internal;
+using System.Reflection;
+
+namespace ChocolateStores.Context;
+
+#pragma warning disable EF1001
+public class InStoreAssembly : MigrationsAssembly, IMigrationsAssembly
+{
+    private readonly DbContext _context;
+
+    public InStoreAssembly(
+        ICurrentDbContext currentContext,
+        IDbContextOptions options,
+        IMigrationsIdGenerator idGenerator,
+        IDiagnosticsLogger<DbLoggerCategory.Migrations> logger
+    )
+        : base(currentContext, options, idGenerator, logger)
+    {
+        _context = currentContext.Context;
+    }
+
+    public override Migration CreateMigration(TypeInfo migrationClass, string activeProvider)
+    {
+        if (activeProvider == null || activeProvider == string.Empty)
+        {
+            throw new ArgumentNullException(nameof(activeProvider));
+        }
+
+        bool isInStoreMigration = migrationClass.GetConstructor(new[] { typeof(IInStoreContext) }) != null;
+
+        if (isInStoreMigration && _context is IInStoreContext storeContext)
+        {
+            Migration? migration = (Migration?)Activator.CreateInstance(migrationClass.AsType(), storeContext);
+
+            if (migration != null)
+            {
+                migration.ActiveProvider = activeProvider;
+
+                return migration;
+            }
+        }
+
+        return base.CreateMigration(migrationClass, activeProvider);
+    }
+}
+```
+
+> \* You can check the original `CreateMigration` implementation at: 
+> [https://github.com/dotnet/efcore/blob/release/7.0/src/EFCore.Relational/Migrations/Internal/MigrationsAssembly.cs](https://github.com/dotnet/efcore/blob/release/7.0/src/EFCore.Relational/Migrations/Internal/MigrationsAssembly.cs)
+
+The second step is to create a couple more classes: one that replaces the `ModelCacheKey` class and one that implements `IModelCacheKeyFactory` using our implementation from the previous one. This is needed because the `ModelCacheKey` is used by EF to track if a migration has or not been performed, therefore we need to add the schema in consideration, otherwise it will only perform migrations for only one schema.
+
+We start by creating a `Contexts/InStoreCacheKey.cs` class and storing privately the possible schema name, context type and if is run in design mode or not. Those fields will be used to compare objects and generate the object's hash.
+
+```cs
+using Microsoft.EntityFrameworkCore;
+
+namespace ChocolateStores.Context;
+
+internal class InStoreCacheKey
+{
+    private readonly Type _dbContextType;
+    private readonly bool _designTime;
+    private readonly string? _schema;
+
+    public InStoreCacheKey(DbContext context, bool designTime)
+    {
+        _dbContextType = context.GetType();
+        _designTime = designTime;
+        _schema = (context as IInStoreContext)?.Schema;
+    }
+
+    protected bool Equals(InStoreCacheKey other) =>
+        _dbContextType == other._dbContextType
+        && _designTime == other._designTime
+        && _schema == other._schema;
+
+    public override bool Equals(object? obj) =>
+        (obj is InStoreCacheKey otherAsKey) && Equals(otherAsKey);
+
+    public override int GetHashCode()
+    {
+        HashCode hash = new();
+        hash.Add(_dbContextType);
+        hash.Add(_designTime);
+        hash.Add(_schema);
+
+        return hash.ToHashCode();
+    }
+}
+```
+
+And now we create a factory (`Contexts/InStoreCacheKeyFactory.cs`) that implements our `InStoreCacheKey`:
+
+```cs
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+
+namespace ChocolateStores.Context;
+
+internal class InStoreCacheKeyFactory : IModelCacheKeyFactory
+{
+    public object Create(DbContext context, bool designTime)
+    {
+        return new InStoreCacheKey(context, designTime);
+    }
+}
+```
+
+The final step is to configure those classes for dependency injection in the `InStoreContext`'s `OnConfiguring` method, and voilà! Now we are ready for performing migrations.
+
+```cs
+...
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
+...
+protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        optionsBuilder
+            .ReplaceService<IMigrationsAssembly, InStoreAssembly>()
+            .ReplaceService<IModelCacheKeyFactory, InStoreCacheKeyFactory>();
+...
+```
+
+To perform those migrations automatically together with the `HQContext` ones, we will need to alter a bit the `Program.cs`:
+
+```cs
+...
+using (IServiceScope scope = app.Services.CreateScope())
+{
+    HQContext hqContext = scope.ServiceProvider.GetRequiredService<HQContext>();
+    IConfiguration configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+
+    hqContext.Database.Migrate();
+
+    foreach (string schema in hqContext.Stores.AsNoTracking().Select(x => x.Schema).ToList())
+    {
+        using InStoreContext worldContext = new(configuration, schema);
+
+        worldContext.Database.Migrate();
+    }
+}
+...
+```
+
+And let's go ahead and add an endpoint to the `StoresController.cs` to trigger those migrations, so we don't need to restart the app every time a store is created.
+
+```cs
+...
+    private readonly ILogger<StoresController> _logger;
+    private readonly IConfiguration _configuration;
+    private readonly HQContext _hQContext;
+
+    public StoresController(
+        ILogger<StoresController> logger,
+        IConfiguration configuration,
+        HQContext hQContext
+    )
+    {
+        _logger = logger;
+        _configuration = configuration;
+        _hQContext = hQContext;
+    }
+...
+    [HttpGet("migrate")]
+    public async Task PostMigrate()
+    {
+        _logger.LogDebug("Performing migrations to all stores");
+
+        foreach (string schema in _hQContext.Stores.AsNoTracking().Select(x => x.Schema).ToList())
+        {
+            using InStoreContext worldContext = new(_configuration, schema);
+
+            await worldContext.Database.MigrateAsync();
+        }
+    }
+...
+```
+
+> \* To avoid code duplication we could extract this logic to an extension.
