@@ -4,11 +4,13 @@
 * dotnet-ef     `7.0.111`
 * PostgreSQL    `15.2`
 
-| Approach| Column for Tenant?|Schema per Tenant?|Multiple Databases?|EF Core Support|
-|---|---|---|---|---|
-|Discriminator (column)|Yes|No|No|Global query filter|
-|Database per tenant|No|No|Yes|Configuration|
-|Schema per tenant|No|Yes|No|Not supported|
+| Approach               | Column for Tenant? | Schema per Tenant? | Multiple Databases? | EF Core Support     |
+| ---------------------- | ------------------ | ------------------ | ------------------- | ------------------- |
+| Discriminator (column) | Yes                | No                 | No                  | Global query filter |
+| Database per tenant    | No                 | No                 | Yes                 | Configuration       |
+| Schema per tenant      | No                 | Yes                | No                  | Not supported       |
+
+## Head Quarter's API
 
 ### Scafolding the base project
 
@@ -252,3 +254,114 @@ using (IServiceScope scope = app.Services.CreateScope())
 }
 ...
 ```
+
+### HQ Controllers and sample data
+
+For the controllers let's keep it simple, just a `GET` and a `POST`. There's no need for a full CRUD api in this proof of concept. We are also not going to implement any services/repositories for the sake of brevidity, therefore we are goint to inject the `HQContext` directly in the `StoresController`
+
+```cs
+using ChocolateStores.Context;
+using ChocolateStores.Models;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+
+namespace ChocolateStores.Controllers;
+
+[ApiController]
+[Route("[controller]")]
+public class StoresController : ControllerBase
+{
+    private readonly ILogger<StoresController> _logger;
+    private readonly HQContext _hQContext;
+
+    public StoresController(ILogger<StoresController> logger, HQContext hQContext)
+    {
+        _logger = logger;
+        _hQContext = hQContext;
+    }
+
+    [HttpGet]
+    public async Task<IEnumerable<Store>> Get()
+    {
+        _logger.LogDebug("Getting store list");
+
+        return await _hQContext.Stores.OrderBy(x => x.Schema).ToListAsync();
+    }
+
+    [HttpPost]
+    public async Task<Store> Post(Store store)
+    {
+        _logger.LogDebug("Adding new store");
+
+        _hQContext.Stores.Add(store);
+
+        await _hQContext.SaveChangesAsync();
+
+        return store;
+    }
+}
+```
+
+And let's create a `ProductsController` in the same fashion:
+
+```cs
+using ChocolateStores.Context;
+using ChocolateStores.Models;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+
+namespace ChocolateStores.Controllers;
+
+[ApiController]
+[Route("[controller]")]
+public class ProductsController : ControllerBase
+{
+    private readonly ILogger<ProductsController> _logger;
+    private readonly HQContext _hQContext;
+
+    public ProductsController(ILogger<ProductsController> logger, HQContext hQContext)
+    {
+        _logger = logger;
+        _hQContext = hQContext;
+    }
+
+    [HttpGet]
+    public async Task<IEnumerable<Product>> Get()
+    {
+        _logger.LogDebug("Getting store list");
+
+        return await _hQContext.Products.OrderBy(x => x.Name).ToListAsync();
+    }
+
+    [HttpPost]
+    public async Task<Product> Post(Product product)
+    {
+        _logger.LogDebug("Adding new store");
+
+        _hQContext.Products.Add(product);
+
+        await _hQContext.SaveChangesAsync();
+
+        return product;
+    }
+}
+```
+
+We can now add some data via swagger. So let's populate our table with these records:
+
+| code | name              | city      | schema |
+| ---- | ----------------- | --------  | ------ |
+| ST01 | Chocolate Store   | Brugge    | st01   |
+| ST02 | Chocolate Express | Bruxelles | st02   |
+
+| code | name               | type     |
+| ---- | ------------------ | -------- |
+| B01  | Noir avec Noisette | Tablette |
+| B02  | Noir avec Pistache | Tablette |
+| PR01 | Manon Noir         | Pralines |
+| PR02 | Manon au Lait      | Pralines |
+
+> \* The `isDiscontinued` prop can be ommited. It will default to `false`.
+
+🎉 We are all set for the HQ tables and data. Let's move on to the store per store api.
+
