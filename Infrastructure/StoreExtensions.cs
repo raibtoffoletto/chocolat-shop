@@ -1,0 +1,53 @@
+using ChocolateStores.Context;
+using ChocolateStores.Models;
+using Microsoft.EntityFrameworkCore;
+
+namespace ChocolateStores.Infrastructure;
+
+public static class StoreExtensions
+{
+    public static IServiceCollection AddDataContexts(this IServiceCollection serviceCollection)
+    {
+        serviceCollection.AddHttpContextAccessor();
+        serviceCollection.AddDbContext<HQContext>();
+
+        serviceCollection.AddScoped(ctx =>
+        {
+            IConfiguration config =
+                ctx.GetService<IConfiguration>()
+                ?? throw new Exception("Could not find configurations");
+
+            if (EF.IsDesignTime)
+            {
+                return new InStoreContext(config, new DbContextOptions<InStoreContext>());
+            }
+
+            IHttpContextAccessor httpContext =
+                ctx.GetService<IHttpContextAccessor>()
+                ?? throw new Exception("HTTP context not accessible");
+
+            HQContext hqContext =
+                ctx.GetService<HQContext>() ?? throw new Exception("HQ database not set");
+
+            string schema =
+                httpContext.HttpContext?.GetSchemaFromHeader(hqContext)
+                ?? InStoreContext.DefaultSchema;
+
+            return new InStoreContext(config, schema);
+        });
+
+        return serviceCollection;
+    }
+
+    public static string? GetSchemaFromHeader(this HttpContext http, HQContext hqContext)
+    {
+        string? code =
+            http.Request.Headers[StoreHeader.HeaderName].FirstOrDefault() ?? string.Empty;
+
+        Store? store = hqContext.Stores
+            .AsNoTracking()
+            .FirstOrDefault(x => EF.Functions.ILike(x.Code, code));
+
+        return store?.Schema;
+    }
+}

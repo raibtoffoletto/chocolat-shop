@@ -21,6 +21,11 @@ public class InStoreContext : DbContext, IInStoreContext
 
     public InStoreContext(IConfiguration configuration, string schema)
     {
+        if (schema == DefaultSchema)
+        {
+            throw new Exception("Failed to consult data for this store.");
+        }
+
         Schema = schema;
 
         _connection = HQContext.GetConnection(configuration);

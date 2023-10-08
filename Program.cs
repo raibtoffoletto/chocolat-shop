@@ -1,12 +1,12 @@
 using ChocolateStores.Context;
+using ChocolateStores.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-builder.Services.AddDbContext<HQContext>();
-builder.Services.AddDbContext<InStoreContext>();
+builder.Services.AddSwaggerGen(c => c.OperationFilter<StoreHeader>());
+builder.Services.AddDataContexts();
 
 WebApplication app = builder.Build();
 

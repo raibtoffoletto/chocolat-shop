@@ -378,7 +378,7 @@ public class Catalogue
     public int Stock { get; set; }
 
     [Column("last_order")]
-    public DateTime LastOrder { get; set; } = DateTime.Now;
+    public DateTime LastOrder { get; set; } = DateTime.UtcNow;
 }
 
 public class CatalogueConfiguration : IEntityTypeConfiguration<Catalogue>
@@ -705,3 +705,199 @@ And let's go ahead and add an endpoint to the `StoresController.cs` to trigger t
 ```
 
 > \* To avoid code duplication we could extract this logic to an extension.
+
+### Dynamically querying a store
+
+Now we have the database in place, it's time to set up a way to define what store is being querying at runtime and inject the `InStoreContext` accordingly. For that, we will be passing the `Store.Code` via the HTTP headers.
+
+To not pollute the `Program.cs`, and have better control of injection order, we are going to create an extension (`Infrastructure/StoreExtensions.cs`) to handle the registering of both database contexts. First, we will need to inject `IHttpContextAccessor`, so the `HttpContext` can be available to us. Then, we add the `HQContext` as before, and then we will add the `InStoreContext` as a scoped service. Inside the service registration, we check if the program is in designTime, if yes we return a default `InStoreContext`, so the schema does not impact the migrations. Otherwise, we access the HTTP request to get the store code and query the store schema from it, in case of not found we fallback to the default schema name.
+
+```cs
+using ChocolateStores.Context;
+using ChocolateStores.Models;
+using Microsoft.EntityFrameworkCore;
+
+namespace ChocolateStores.Infrastructure;
+
+public static class StoreExtensions
+{
+    public static IServiceCollection AddDataContexts(this IServiceCollection serviceCollection)
+    {
+        serviceCollection.AddHttpContextAccessor();
+        serviceCollection.AddDbContext<HQContext>();
+
+        serviceCollection.AddScoped(ctx =>
+        {
+            IConfiguration config = ctx.GetService<IConfiguration>() ?? throw new Exception("Could not find configurations");
+
+            if (EF.IsDesignTime)
+            {
+                return new InStoreContext(config, new DbContextOptions<InStoreContext>());
+            }
+
+            IHttpContextAccessor httpContext = ctx.GetService<IHttpContextAccessor>() ?? throw new Exception("HTTP context not accessible");
+
+            HQContext hqContext = ctx.GetService<HQContext>() ?? throw new Exception("HQ database not set");
+
+            string schema = httpContext.HttpContext?.GetSchemaFromHeader(hqContext) ?? InStoreContext.DefaultSchema;
+
+            return new InStoreContext(config, schema);
+        });
+
+        return serviceCollection;
+    }
+
+    public static string? GetSchemaFromHeader(this HttpContext http, HQContext hqContext)
+    {
+        string? code =
+            http.Request.Headers[StoreHeader.HeaderName].FirstOrDefault() ?? string.Empty;
+
+        Store? store = hqContext.Stores
+            .AsNoTracking()
+            .FirstOrDefault(x => EF.Functions.ILike(x.Code, code));
+
+        return store?.Schema;
+    }
+}
+```
+
+Then, to be sure that our `InStoreContext` is only used with valid schemas, we add this exception to its constructor:
+
+```cs
+...
+    public InStoreContext(IConfiguration configuration, string schema)
+    {
+        if (schema == DefaultSchema)
+        {
+            throw new Exception("Failed to consult data for this store.");
+        }
+
+        Schema = schema;
+
+        _connection = HQContext.GetConnection(configuration);
+    }
+...
+```
+
+To help us pass the store code via the HTTP headers when using the Swagger page, we can create a decorator (`Infrastructure/StoreHeader.cs`) to use in the required controller's routes.
+
+```cs
+using System.Reflection;
+using Microsoft.OpenApi.Models;
+using Swashbuckle.AspNetCore.SwaggerGen;
+
+namespace ChocolateStores.Infrastructure;
+
+[AttributeUsage(AttributeTargets.Method)]
+public class UseStoreHeader : Attribute { }
+
+public class StoreHeader : IOperationFilter
+{
+    public static readonly string HeaderName = "store-code";
+
+    public void Apply(OpenApiOperation operation, OperationFilterContext context)
+    {
+        operation.Parameters ??= new List<OpenApiParameter>();
+
+        if (context.MethodInfo.GetCustomAttribute(typeof(UseStoreHeader)) is UseStoreHeader _)
+        {
+            operation.Parameters.Add(
+                new OpenApiParameter()
+                {
+                    Name = HeaderName,
+                    In = ParameterLocation.Header,
+                    Required = true
+                }
+            );
+        }
+    }
+}
+```
+
+To use our extension and decorators, we simply alter the `Program.cs` by removing both `AddDbContext()` lines and inserting those below:
+
+```cs
+...
+using ChocolateStores.Infrastructure;
+...
+builder.Services.AddSwaggerGen(c => c.OperationFilter<StoreHeader>());
+builder.Services.AddDataContexts();
+...
+```
+
+And now, we can create a store controller (`Controllers/InStoreController.cs`) with a simple `GET` and `POST` that will execute operations for a specific store.
+
+```cs
+using ChocolateStores.Context;
+using ChocolateStores.Models.InStore;
+using ChocolateStores.Infrastructure;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using ChocolateStores.Models;
+
+namespace ChocolateStores.Controllers;
+
+[ApiController]
+[Route("[controller]")]
+public class InStoreController : ControllerBase
+{
+    private readonly ILogger<InStoreController> _logger;
+    private readonly InStoreContext _storeContext;
+
+    public InStoreController(ILogger<InStoreController> logger, InStoreContext storeContext)
+    {
+        _logger = logger;
+        _storeContext = storeContext;
+    }
+
+    [HttpGet("Stock"), UseStoreHeader]
+    public async Task<IEnumerable<Catalogue>> GetStock()
+    {
+        _logger.LogDebug("Getting stock for store: {store}", _storeContext.Schema);
+
+        return await _storeContext.Catalogue.OrderByDescending(x => x.LastOrder).ToListAsync();
+    }
+
+    [HttpPost("Stock"), UseStoreHeader]
+    public async Task<Catalogue> PostStock(Catalogue stock)
+    {
+        _logger.LogDebug("Updating stock for store: {store}", _storeContext.Schema);
+
+        Catalogue? catalogue = await _storeContext.Catalogue.FirstOrDefaultAsync(
+            x => x.Code == stock.Code
+        );
+
+        if (catalogue == null)
+        {
+            _storeContext.Catalogue.Add(stock);
+        }
+        else
+        {
+            catalogue.Stock = stock.Stock;
+            catalogue.LastOrder = stock.LastOrder;
+        }
+
+        await _storeContext.SaveChangesAsync();
+
+        return stock;
+    }
+}
+```
+
+All set! Now we can pass the store id to those routes and operations will be restricted to the corresponding store. So let's add some data for the stores we had registered.
+
+* **Store 01**
+
+| code | stock |
+| ---- | ----- |
+| B01  | 100   |
+| B02  | 100   |
+| PR02 | 100   |
+| PR01 | 100   |
+
+* **Store 02**
+
+| code | stock |
+| ---- | ----- |
+| B02  | 100   |
+| PR02 | 100   |
