@@ -14,7 +14,7 @@ public class Catalogue
     public int Stock { get; set; }
 
     [Column("last_order")]
-    public DateTime LastOrder { get; set; } = DateTime.Now;
+    public DateTime LastOrder { get; set; } = DateTime.UtcNow;
 }
 
 public class CatalogueConfiguration : IEntityTypeConfiguration<Catalogue>
