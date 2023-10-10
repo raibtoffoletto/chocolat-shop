@@ -26,7 +26,7 @@ namespace ChocolateStores.Migrations.InStore
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("ChocolateStores.Models.InStore.Catalogue", b =>
+            modelBuilder.Entity("ChocolateStores.Models.InStore.Inventory", b =>
                 {
                     b.Property<string>("Code")
                         .HasColumnType("text")
@@ -46,7 +46,7 @@ namespace ChocolateStores.Migrations.InStore
 
                     b.HasKey("Code");
 
-                    b.ToTable("catalogue", "public");
+                    b.ToTable("inventory", "public");
                 });
 
             modelBuilder.Entity("ChocolateStores.Models.Product", b =>

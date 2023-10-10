@@ -20,18 +20,18 @@ public class InStoreController : ControllerBase
         _storeContext = storeContext;
     }
 
-    [HttpGet("Stock"), UseStoreHeader]
-    public async Task<IEnumerable<Catalogue>> GetStock()
+    [HttpGet("Inventory"), UseStoreHeader]
+    public async Task<IEnumerable<Inventory>> GetStock()
     {
-        _logger.LogDebug("Getting stock for store: {store}", _storeContext.Schema);
+        _logger.LogDebug("Getting inventory for store: {store}", _storeContext.Schema);
 
-        return await _storeContext.Catalogue.OrderByDescending(x => x.LastOrder).ToListAsync();
+        return await _storeContext.Inventory.OrderByDescending(x => x.LastOrder).ToListAsync();
     }
 
-    [HttpPost("Stock"), UseStoreHeader]
-    public async Task<Catalogue> PostStock(Catalogue stock)
+    [HttpPost("Inventory"), UseStoreHeader]
+    public async Task<Inventory> PostInventory(Inventory stock)
     {
-        _logger.LogDebug("Updating stock for store: {store}", _storeContext.Schema);
+        _logger.LogDebug("Updating inventory for store: {store}", _storeContext.Schema);
 
         Product product =
             await _storeContext.Products.FirstOrDefaultAsync(
@@ -43,19 +43,19 @@ public class InStoreController : ControllerBase
             throw new Exception("Product is discontinued, cannot order any more");
         }
 
-        Catalogue? catalogue = await _storeContext.Catalogue.FirstOrDefaultAsync(
+        Inventory? inventory = await _storeContext.Inventory.FirstOrDefaultAsync(
             x => x.Code == product.Code
         );
 
-        if (catalogue == null)
+        if (inventory == null)
         {
-            _storeContext.Catalogue.Add(stock);
+            _storeContext.Inventory.Add(stock);
         }
         else
         {
-            catalogue.Stock = stock.Stock;
-            catalogue.Price = stock.Price;
-            catalogue.LastOrder = stock.LastOrder;
+            inventory.Stock = stock.Stock;
+            inventory.Price = stock.Price;
+            inventory.LastOrder = stock.LastOrder;
         }
 
         await _storeContext.SaveChangesAsync();
@@ -68,7 +68,7 @@ public class InStoreController : ControllerBase
     {
         _logger.LogDebug("Getting catalogue for store: {store}", _storeContext.Schema);
 
-        return await _storeContext.Catalogue
+        return await _storeContext.Inventory
             .Join(
                 _storeContext.Products,
                 c => c.Code,

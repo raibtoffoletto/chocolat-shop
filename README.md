@@ -393,7 +393,7 @@ We can now add some data via swagger. So let us populate our table with these re
 
 ### Creating Migrations
 
-For this part let us create a simple entity/table just with the store's catalogue: the products it sells and the current stock. And to keep it organised, it will be in a different directory/namespace: `Models/InStore/Catalogue.cs`.
+For this part let us create a simple entity/table just with the store's inventory: the products it sells and the current stock. And to keep it organised, it will be in a different directory/namespace: `Models/InStore/Inventory.cs`.
 
 ```cs
 using System.ComponentModel.DataAnnotations.Schema;
@@ -402,8 +402,8 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace ChocolateStores.Models.InStore;
 
-[Table("catalogue")]
-public class Catalogue
+[Table("inventory")]
+public class Inventory
 {
     [Column("code")]
     public string Code { get; set; } = string.Empty;
@@ -415,9 +415,9 @@ public class Catalogue
     public DateTime LastOrder { get; set; } = DateTime.UtcNow;
 }
 
-public class CatalogueConfiguration : IEntityTypeConfiguration<Catalogue>
+public class CatalogueConfiguration : IEntityTypeConfiguration<Inventory>
 {
-    public void Configure(EntityTypeBuilder<Catalogue> builder)
+    public void Configure(EntityTypeBuilder<Inventory> builder)
     {
         builder.HasKey(x => x.Code);
     }
@@ -466,7 +466,7 @@ public class InStoreContext : DbContext, IInStoreContext
         _connection = HQContext.GetConnection(configuration);
     }
 
-    public DbSet<Catalogue> Catalogue { get; set; }
+    public DbSet<Inventory> Inventory { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -474,7 +474,7 @@ public class InStoreContext : DbContext, IInStoreContext
 
         modelBuilder.ApplyConfigurationsFromAssembly(
             typeof(InStoreContext).Assembly,
-            t => t.Namespace == typeof(Catalogue).Namespace
+            t => t.Namespace == typeof(Inventory).Namespace
         );
     }
 
@@ -504,11 +504,11 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace ChocolateStores.Migrations.InStore
 {
-    public partial class InitialInStore_Catalogue : Migration
+    public partial class InitialInStore_Inventory : Migration
     {
         private readonly IInStoreContext _context;
 
-        public InitialInStore_Catalogue(IInStoreContext context)
+        public InitialInStore_Inventory(IInStoreContext context)
         {
             _context = context;
         }
@@ -518,7 +518,7 @@ namespace ChocolateStores.Migrations.InStore
             migrationBuilder.EnsureSchema(name: _context.Schema);
 
             migrationBuilder.CreateTable(
-                name: "catalogue",
+                name: "inventory",
                 schema: _context.Schema,
                 columns: table =>
                     new
@@ -536,7 +536,7 @@ namespace ChocolateStores.Migrations.InStore
 
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(name: "catalogue", schema: _context.Schema);
+            migrationBuilder.DropTable(name: "inventory", schema: _context.Schema);
         }
     }
 }
@@ -886,31 +886,31 @@ public class InStoreController : ControllerBase
         _storeContext = storeContext;
     }
 
-    [HttpGet("Stock"), UseStoreHeader]
-    public async Task<IEnumerable<Catalogue>> GetStock()
+    [HttpGet("Inventory"), UseStoreHeader]
+    public async Task<IEnumerable<Inventory>> GetInventory()
     {
-        _logger.LogDebug("Getting stock for store: {store}", _storeContext.Schema);
+        _logger.LogDebug("Getting inventory for store: {store}", _storeContext.Schema);
 
-        return await _storeContext.Catalogue.OrderByDescending(x => x.LastOrder).ToListAsync();
+        return await _storeContext.Inventory.OrderByDescending(x => x.LastOrder).ToListAsync();
     }
 
-    [HttpPost("Stock"), UseStoreHeader]
-    public async Task<Catalogue> PostStock(Catalogue stock)
+    [HttpPost("Inventory"), UseStoreHeader]
+    public async Task<Inventory> PostInventory(Inventory stock)
     {
-        _logger.LogDebug("Updating stock for store: {store}", _storeContext.Schema);
+        _logger.LogDebug("Updating inventory for store: {store}", _storeContext.Schema);
 
-        Catalogue? catalogue = await _storeContext.Catalogue.FirstOrDefaultAsync(
+        Inventory? inventory = await _storeContext.Inventory.FirstOrDefaultAsync(
             x => x.Code == stock.Code
         );
 
-        if (catalogue == null)
+        if (inventory == null)
         {
-            _storeContext.Catalogue.Add(stock);
+            _storeContext.Inventory.Add(stock);
         }
         else
         {
-            catalogue.Stock = stock.Stock;
-            catalogue.LastOrder = stock.LastOrder;
+            inventory.Stock = stock.Stock;
+            inventory.LastOrder = stock.LastOrder;
         }
 
         await _storeContext.SaveChangesAsync();
@@ -940,7 +940,7 @@ All set! Now we can pass the store id to those routes and operations will be res
 
 ### Join query between schemas.
 
-One of the pitfalls of this architecture is that EF will not perform joining queries from sets that are not in the same context. For example, imagine that we want to return the catalogue list with the product's name and type and the in store current stock... one solution is to query the store products first, keep them in memory, then query the HQ's catalogue and join both lists using LINQ. This can be very slow (and memory consuming) depending on the size of the dataset in question. Other way would be to write manually a query and then cast its results to the corresponding DTO.
+One of the pitfalls of this architecture is that EF will not perform joining queries from sets that are not in the same context. For example, imagine that we want to return the inventory list with the product's name and type and the in store current stock... one solution is to query the store products first, keep them in memory, then query the HQ's inventory and join both lists using LINQ. This can be very slow (and memory consuming) depending on the size of the dataset in question. Other way would be to write manually a query and then cast its results to the corresponding DTO.
 
 However, there is also another solution: to add a `Products` set to the `InStoreContext`. To do that, the configuration is a bit different than the other entities. In the `OnModelCreating` method, we need to configure the `Product` entity as it is done in the `ProductConfiguration` class. We also need to set the correct schema to the entity's metadata, as well set it to be excluded from the migrations in that context.
 
@@ -978,7 +978,7 @@ In the `InStoreController` we can extend the `POST` method to validate the produ
 
 ```cs
 ...
-    public async Task<Catalogue> PostStock(Catalogue stock)
+    public async Task<Inventory> PostStock(Inventory stock)
     {
         _logger.LogDebug("Updating stock for store: {store}", _storeContext.Schema);
 
@@ -992,7 +992,7 @@ In the `InStoreController` we can extend the `POST` method to validate the produ
             throw new Exception("Product is discontinued, cannot order any more");
         }
 
-        Catalogue? catalogue = await _storeContext.Catalogue.FirstOrDefaultAsync(
+        Inventory? inventory = await _storeContext.Inventory.FirstOrDefaultAsync(
             x => x.Code == product.Code
         );
 ...
@@ -1003,7 +1003,7 @@ In the `InStoreController` we can extend the `POST` method to validate the produ
     {
         _logger.LogDebug("Getting catalogue for store: {store}", _storeContext.Schema);
 
-        return await _storeContext.Catalogue
+        return await _storeContext.Inventory
             .Join(
                 _storeContext.Products,
                 c => c.Code,
@@ -1028,7 +1028,7 @@ That is it! With this method you can still have access to the HQ's entity, the d
 > **Bonus Tasks:**
 > - Extract the migration logic to an extension to avoid code duplication
 > - Implement `Upsert` logic in the store and product controllers
-> - Extend the Product and Catalogue entities to include a price property,
+> - Extend the Product and Inventory entities to include a price property,
 > the DTO could contain both informations.
 > - Try it out with MSSQL.
 > - Create a front-end consumer for the API.

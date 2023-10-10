@@ -3,6 +3,7 @@ using System;
 using ChocolateStores.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace ChocolateStores.Migrations.InStore
 {
     [DbContext(typeof(InStoreContext))]
-    partial class InStoreContextModelSnapshot : ModelSnapshot
+    [Migration("20231002163234_InitialInStore_Inventory")]
+    partial class InitialInStore_Inventory
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -33,10 +36,6 @@ namespace ChocolateStores.Migrations.InStore
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_order");
 
-                    b.Property<decimal>("Price")
-                        .HasColumnType("numeric")
-                        .HasColumnName("price");
-
                     b.Property<int>("Stock")
                         .HasColumnType("integer")
                         .HasColumnName("stock");
@@ -44,38 +43,6 @@ namespace ChocolateStores.Migrations.InStore
                     b.HasKey("Code");
 
                     b.ToTable("inventory", "public");
-                });
-
-            modelBuilder.Entity("ChocolateStores.Models.Product", b =>
-                {
-                    b.Property<string>("Code")
-                        .HasColumnType("text")
-                        .HasColumnName("code");
-
-                    b.Property<bool>("IsDiscontinued")
-                        .HasColumnType("boolean")
-                        .HasColumnName("discontinued");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("name");
-
-                    b.Property<decimal>("Price")
-                        .HasColumnType("numeric")
-                        .HasColumnName("price");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("type");
-
-                    b.HasKey("Code");
-
-                    b.ToTable("products", "hq", t =>
-                        {
-                            t.ExcludeFromMigrations();
-                        });
                 });
 #pragma warning restore 612, 618
         }

@@ -17,7 +17,7 @@ public partial class InStore_AddPrice : Migration
         migrationBuilder.AddColumn<decimal>(
             name: "price",
             schema: _context.Schema,
-            table: "catalogue",
+            table: "inventory",
             type: "numeric",
             nullable: false,
             defaultValue: 0m
@@ -26,6 +26,6 @@ public partial class InStore_AddPrice : Migration
 
     protected override void Down(MigrationBuilder migrationBuilder)
     {
-        migrationBuilder.DropColumn(name: "price", schema: _context.Schema, table: "catalogue");
+        migrationBuilder.DropColumn(name: "price", schema: _context.Schema, table: "inventory");
     }
 }

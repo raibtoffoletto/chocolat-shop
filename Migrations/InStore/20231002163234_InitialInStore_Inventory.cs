@@ -3,11 +3,11 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace ChocolateStores.Migrations.InStore;
 
-public partial class InitialInStore_Catalogue : Migration
+public partial class InitialInStore_Inventory : Migration
 {
     private readonly IInStoreContext _context;
 
-    public InitialInStore_Catalogue(IInStoreContext context)
+    public InitialInStore_Inventory(IInStoreContext context)
     {
         _context = context;
     }
@@ -17,7 +17,7 @@ public partial class InitialInStore_Catalogue : Migration
         migrationBuilder.EnsureSchema(name: _context.Schema);
 
         migrationBuilder.CreateTable(
-            name: "catalogue",
+            name: "inventory",
             schema: _context.Schema,
             columns: table =>
                 new
@@ -35,6 +35,6 @@ public partial class InitialInStore_Catalogue : Migration
 
     protected override void Down(MigrationBuilder migrationBuilder)
     {
-        migrationBuilder.DropTable(name: "catalogue", schema: _context.Schema);
+        migrationBuilder.DropTable(name: "inventory", schema: _context.Schema);
     }
 }

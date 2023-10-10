@@ -4,8 +4,8 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace ChocolateStores.Models.InStore;
 
-[Table("catalogue")]
-public class Catalogue
+[Table("inventory")]
+public class Inventory
 {
     [Column("code")]
     public string Code { get; set; } = string.Empty;
@@ -20,9 +20,9 @@ public class Catalogue
     public DateTime LastOrder { get; set; } = DateTime.UtcNow;
 }
 
-public class CatalogueConfiguration : IEntityTypeConfiguration<Catalogue>
+public class CatalogueConfiguration : IEntityTypeConfiguration<Inventory>
 {
-    public void Configure(EntityTypeBuilder<Catalogue> builder)
+    public void Configure(EntityTypeBuilder<Inventory> builder)
     {
         builder.HasKey(x => x.Code);
     }

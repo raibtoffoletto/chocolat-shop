@@ -32,7 +32,7 @@ public class InStoreContext : DbContext, IInStoreContext
         _connection = HQContext.GetConnection(configuration);
     }
 
-    public DbSet<Catalogue> Catalogue { get; set; }
+    public DbSet<Inventory> Inventory { get; set; }
     public DbSet<Product> Products { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -41,7 +41,7 @@ public class InStoreContext : DbContext, IInStoreContext
 
         modelBuilder.ApplyConfigurationsFromAssembly(
             typeof(InStoreContext).Assembly,
-            t => t.Namespace == typeof(Catalogue).Namespace
+            t => t.Namespace == typeof(Inventory).Namespace
         );
 
         modelBuilder.Entity<Product>(x =>
