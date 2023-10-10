@@ -1,6 +1,4 @@
-using ChocolateStores.Context;
 using ChocolateStores.Infrastructure;
-using Microsoft.EntityFrameworkCore;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
@@ -9,22 +7,7 @@ builder.Services.AddSwaggerGen(c => c.OperationFilter<StoreHeader>());
 builder.Services.AddDataContexts();
 
 WebApplication app = builder.Build();
-
-using (IServiceScope scope = app.Services.CreateScope())
-{
-    HQContext hqContext = scope.ServiceProvider.GetRequiredService<HQContext>();
-    IConfiguration configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
-
-    hqContext.Database.Migrate();
-
-    foreach (string schema in hqContext.Stores.AsNoTracking().Select(x => x.Schema).ToList())
-    {
-        using InStoreContext worldContext = new(configuration, schema);
-
-        worldContext.Database.Migrate();
-    }
-}
-
+app.ApplyDbMigrations();
 app.UseSwagger();
 app.UseSwaggerUI();
 app.UseAuthorization();

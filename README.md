@@ -1,14 +1,36 @@
 # Multi-tenancy using schemas with Entity Framework and PostgreSQL
 
-* dotnet    `7.0.111`
-* dotnet-ef     `7.0.111`
-* PostgreSQL    `15.2`
+## Introduction
+
+Multi-tenancy is when a single software handle multiple customers and it can be achieved through different architectures. One of them is the use of a single database and using table's `schemas` to separate data from one account to another. 
+
+One popular choice for constructing web apis is to use Microsoft's «.NET» with it's «Entity Framework» ORM. However, the official documentation for achieving multi-tenancy with EF do not support use of schemas:
 
 | Approach               | Column for Tenant? | Schema per Tenant? | Multiple Databases? | EF Core Support     |
 | ---------------------- | ------------------ | ------------------ | ------------------- | ------------------- |
 | Discriminator (column) | Yes                | No                 | No                  | Global query filter |
 | Database per tenant    | No                 | No                 | Yes                 | Configuration       |
 | Schema per tenant      | No                 | Yes                | No                  | Not supported       |
+
+But fear not. There is a way! In this article we will explore how to achieve it without [*too much*] effort.
+
+### Proposed scenario
+
+Let us imagine that we are a belgium chocolate maker. With have our Head Quarters where all production is made, and we have a few stores in different cities. The HQ control the records for how many stores we own and the records for all products manufactured. 
+
+Each store than will handle the record of current inventory, sales, employees, etc... for bureaucratic reasons those records should be completely isolated from each other.
+So we will use different schemas for each store, and to keep software development simple, our api will have the same set of endpoints to handle multiple store requests.
+
+### Tools used
+* dotnet - `v7.0.111`
+* dotnet-ef - `v7.0.111`
+* PostgreSQL - `v15.2`
+* Visual Studio Code
+* Ubuntu 22.04 LTS
+
+I won't cover the installation of any of those tools, please, follow the official instructions for your platform.
+
+> All commands are run from a unix-like command line, it may need adapting to your specific platform.
 
 ## Head Quarter's API
 
@@ -37,8 +59,10 @@ dotnet add package Npgsql.EntityFrameworkCore.PostgreSQL
 We can already remove some unnecessary files:
 
 ```bash
-rm -R Properties
 rm WeatherForecast.cs Controllers/WeatherForecastController.cs
+
+# If you are running the project from the terminal, this can also be removed.
+rm -R Properties
 ```
 
 And replace the `Program.cs` with this minimal set up:
@@ -287,7 +311,7 @@ public class StoresController : ControllerBase
     [HttpPost]
     public async Task<Store> Post(Store store)
     {
-        _logger.LogDebug("Adding new store");
+        _logger.LogDebug("Adding new store {name}", store.Name);
 
         _hQContext.Stores.Add(store);
 
@@ -324,7 +348,7 @@ public class ProductsController : ControllerBase
     [HttpGet]
     public async Task<IEnumerable<Product>> Get()
     {
-        _logger.LogDebug("Getting store list");
+        _logger.LogDebug("Getting product list");
 
         return await _hQContext.Products.OrderBy(x => x.Name).ToListAsync();
     }
@@ -332,7 +356,7 @@ public class ProductsController : ControllerBase
     [HttpPost]
     public async Task<Product> Post(Product product)
     {
-        _logger.LogDebug("Adding new store");
+        _logger.LogDebug("Adding new product {name}", product.Name);
 
         _hQContext.Products.Add(product);
 
@@ -708,6 +732,8 @@ And let us go ahead and add an endpoint to the `StoresController.cs` to trigger 
 
         foreach (string schema in _hQContext.Stores.AsNoTracking().Select(x => x.Schema).ToList())
         {
+            _logger.LogDebug("Migrating schema {name}", schema);
+            
             using InStoreContext worldContext = new(_configuration, schema);
 
             await worldContext.Database.MigrateAsync();
@@ -715,8 +741,6 @@ And let us go ahead and add an endpoint to the `StoresController.cs` to trigger 
     }
 ...
 ```
-
-> \* To avoid code duplication you could extract this logic to an extension ;)
 
 ### Dynamically querying a store
 
@@ -998,3 +1022,19 @@ In the `InStoreController` we can extend the `POST` method to validate the produ
     }
 }
 ```
+
+That is it! With this method you can still have access to the HQ's entity, the drawback is that we need to manually configure the `Product` model, the configuration class will not help here.
+
+> **Bonus Tasks:**
+> - Extract the migration logic to an extension to avoid code duplication
+> - Implement `Upsert` logic in the store and product controllers
+> - Extend the Product and Catalogue entities to include a price property,
+> the DTO could contain both informations.
+> - Try it out with MSSQL.
+> - Create a front-end consumer for the API.
+
+## Conclusion
+
+Although not officially supported by EF, multi-tenancy using schemas can be achieved through some tinkering. There are some drawbacks and some advantages when using this solution, so evaluate well if it is worth implementing it. In any case, it is a nice case study to understand better EF's inner works.
+
+> You can check the full project on [github](https://github.com/raibtoffoletto/chocolat-shop).

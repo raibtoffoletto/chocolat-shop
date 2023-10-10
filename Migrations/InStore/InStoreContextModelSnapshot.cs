@@ -33,6 +33,10 @@ namespace ChocolateStores.Migrations.InStore
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_order");
 
+                    b.Property<decimal>("Price")
+                        .HasColumnType("numeric")
+                        .HasColumnName("price");
+
                     b.Property<int>("Stock")
                         .HasColumnType("integer")
                         .HasColumnName("stock");
@@ -40,6 +44,38 @@ namespace ChocolateStores.Migrations.InStore
                     b.HasKey("Code");
 
                     b.ToTable("catalogue", "public");
+                });
+
+            modelBuilder.Entity("ChocolateStores.Models.Product", b =>
+                {
+                    b.Property<string>("Code")
+                        .HasColumnType("text")
+                        .HasColumnName("code");
+
+                    b.Property<bool>("IsDiscontinued")
+                        .HasColumnType("boolean")
+                        .HasColumnName("discontinued");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("numeric")
+                        .HasColumnName("price");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("type");
+
+                    b.HasKey("Code");
+
+                    b.ToTable("products", "hq", t =>
+                        {
+                            t.ExcludeFromMigrations();
+                        });
                 });
 #pragma warning restore 612, 618
         }

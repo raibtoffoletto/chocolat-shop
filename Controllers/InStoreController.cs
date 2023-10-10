@@ -54,6 +54,7 @@ public class InStoreController : ControllerBase
         else
         {
             catalogue.Stock = stock.Stock;
+            catalogue.Price = stock.Price;
             catalogue.LastOrder = stock.LastOrder;
         }
 
@@ -78,6 +79,8 @@ public class InStoreController : ControllerBase
                         Code = c.Code,
                         Name = p.Name,
                         Type = p.Type,
+                        Price = c.Price,
+                        RSP = p.Price,
                         Stock = c.Stock
                     }
             )

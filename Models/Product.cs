@@ -16,6 +16,9 @@ public class Product
     [Column("type")]
     public string Type { get; set; } = string.Empty;
 
+    [Column("price")]
+    public decimal Price { get; set; }
+
     [Column("discontinued")]
     public bool IsDiscontinued { get; set; }
 }

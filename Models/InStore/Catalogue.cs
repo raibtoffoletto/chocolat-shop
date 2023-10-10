@@ -13,6 +13,9 @@ public class Catalogue
     [Column("stock")]
     public int Stock { get; set; }
 
+    [Column("price")]
+    public decimal Price { get; set; }
+
     [Column("last_order")]
     public DateTime LastOrder { get; set; } = DateTime.UtcNow;
 }

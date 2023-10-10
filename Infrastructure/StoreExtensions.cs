@@ -50,4 +50,31 @@ public static class StoreExtensions
 
         return store?.Schema;
     }
+
+    public static WebApplication ApplyDbMigrations(this WebApplication app)
+    {
+        using IServiceScope scope = app.Services.CreateScope();
+
+        HQContext hqContext = scope.ServiceProvider.GetRequiredService<HQContext>();
+
+        hqContext.Database.Migrate();
+        hqContext.ApplyDbMigrations(scope.ServiceProvider.GetRequiredService<IConfiguration>());
+
+        return app;
+    }
+
+    public static void ApplyDbMigrations(this HQContext hqContext, IConfiguration configuration)
+    {
+        foreach (string schema in hqContext.Stores.AsNoTracking().Select(x => x.Schema).ToList())
+        {
+            using InStoreContext worldContext = new(configuration, schema);
+
+            worldContext.Database.Migrate();
+        }
+    }
+
+    public static Task ApplyDbMigrationsAsync(
+        this HQContext hqContext,
+        IConfiguration configuration
+    ) => Task.Run(() => hqContext.ApplyDbMigrations(configuration));
 }

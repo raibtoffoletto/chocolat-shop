@@ -1,4 +1,5 @@
 using ChocolateStores.Context;
+using ChocolateStores.Infrastructure;
 using ChocolateStores.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -62,13 +63,6 @@ public class StoresController : ControllerBase
     {
         _logger.LogDebug("Performing migrations to all stores");
 
-        foreach (string schema in _hQContext.Stores.AsNoTracking().Select(x => x.Schema).ToList())
-        {
-            _logger.LogDebug("Migrating schema {name}", schema);
-
-            using InStoreContext worldContext = new(_configuration, schema);
-
-            await worldContext.Database.MigrateAsync();
-        }
+        await _hQContext.ApplyDbMigrationsAsync(_configuration);
     }
 }
