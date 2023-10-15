@@ -56,10 +56,10 @@ dotnet add package Microsoft.EntityFrameworkCore.Design
 dotnet add package Npgsql.EntityFrameworkCore.PostgreSQL
 ```
 
-We can already remove some unnecessary files:
+We can already remove some unnecessary (for this project) files:
 
 ```bash
-rm WeatherForecast.cs Controllers/WeatherForecastController.cs
+rm appsettings.Development.json WeatherForecast.cs Controllers/WeatherForecastController.cs
 
 # If you are running the project from the terminal, this can also be removed.
 rm -R Properties
@@ -195,13 +195,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ChocolateStores.Context;
 
-public class AppDataContext : DbContext
+public class HQContext : DbContext
 {
     public static readonly string Schema = "hq";
     public static readonly string Migrations = "_migrations";
     protected readonly string _connection;
 
-    public AppDataContext(IConfiguration configuration, DbContextOptions<AppDataContext> options)
+    public HQContext(IConfiguration configuration, DbContextOptions<HQContext> options)
         : base(options)
     {
         _connection = GetConnection(configuration);
@@ -215,7 +215,7 @@ public class AppDataContext : DbContext
         modelBuilder.HasDefaultSchema(Schema);
 
         modelBuilder.ApplyConfigurationsFromAssembly(
-            typeof(AppDataContext).Assembly,
+            typeof(HQContext).Assembly,
             t => t.Namespace == typeof(Store).Namespace
         );
     }
@@ -491,7 +491,7 @@ public class InStoreContext : DbContext, IInStoreContext
 We can now register this context in the `Program.cs` by adding `builder.Services.AddDbContext<InStoreContext>();` (just below the `HQContext` line) and create our fist migration:
 
 ```bash
-dotnet ef migrations add InitialInStore_Catalogue --context InStoreContext --output-dir Migrations/InStore
+dotnet ef migrations add InitialInStore_Inventory --context InStoreContext --output-dir Migrations/InStore
 ```
 
 If we have a look at the Migrations directory, we will see that we have successfully created the file. Easy, right? *«So we can go ahead and apply those migrations?»* Not quite... now it is when the real trickery starts.
@@ -978,9 +978,9 @@ In the `InStoreController` we can extend the `POST` method to validate the produ
 
 ```cs
 ...
-    public async Task<Inventory> PostStock(Inventory stock)
+    public async Task<Inventory> PostInventory(Inventory stock)
     {
-        _logger.LogDebug("Updating stock for store: {store}", _storeContext.Schema);
+        _logger.LogDebug("Updating inventory for store: {store}", _storeContext.Schema);
 
         Product product =
             await _storeContext.Products.FirstOrDefaultAsync(
